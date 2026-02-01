@@ -3,40 +3,50 @@
 #include "PortInterface.h"
 
 #include "stm32f10x.h" 
-#include "SLEDFSEG.h"
+#include "7seg_3_dig_timer.cpp"
 
-using MyLed = SLEDFSEG<Pb10, Pb14, Pb7, Pb5, Pb15, Pb1, Pb8, Pb6, Pb11, Pb0, Pb13, Pb9>;
+using MyTimer = SSEGFDIGTimer<Pb10, Pb14, Pb7, Pb5, Pb15, Pb1, Pb8, Pb6, Pb11, Pb0, Pb13, Pb9>;
 
 extern "C" void TIM2_IRQHandler(void);
 
+uint16_t ResetTimer = 5; // стартовое значение таймера
+uint16_t volatile Timer = ResetTimer; // значение таймера
+
+uint8_t volatile state = 0; // состояние 0b(blink_status)(settings_state)(blink_state)
+#define BLINK_STATE 0x1
+#define SETTINGS_STATE 0x2
+#define BLINK_STATUS 0x4
+
 int main(void){
 	RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_IOPBEN; // 0x10 clock enabled for port C
-	
-	//RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; // Подключение TIM2 к внутреннему таймеру
-	//RCC->CFGR |= 0xA0; // pre division by 8 
 	
 	Pb4::clearOdr();
 	
 	Pc13::setMode(MODE_O2);
 	Pc13::setCnf(CNF_OPP);
 	
-	MyLed::init();
+	MyTimer::initPins();
+	MyTimer::initTimer();
 	
-	//TIM2->PSC = 999; // pre scaler by 4500 (4499 + 1)
-	//TIM2->ARR = 999; // 250 мс
-	//TIM2->DIER |= TIM_DIER_UIE; // Включение прерываний на обновление ARR
-	//NVIC_EnableIRQ(TIM2_IRQn); // Включение обработки прерываний по обновлению таймера
-	//NVIC_SetPriority(TIM2_IRQn, 0); // Постановка приоритета для прерывания (чем меньше, тем выше приоритет)
-	//TIM2->CR1 |= TIM_CR1_CEN; // включение таймера
 	Pc13::clearOdr();
 	while(1){
-		for(uint8_t i = 0; i<4; i++) MyLed::showOnPos(i, i+1);
+		if(state&BLINK_STATUS){ // Если состояние мигания изменилось, то выключаем, иначе отрисовываем таймер
+			MyTimer::allLedOff();
+			continue;
+		}
+		MyTimer::drawTimer(Timer);
 	}
 }
 
-//void TIM2_IRQHandler(void){
+void TIM2_IRQHandler(void){
         // !!! САМОЕ ВАЖНОЕ: Сбрасываем флаг !!!
-        //TIM2->SR &= ~TIM_SR_UIF;
-        
-        //Pc13::toggleOdr(); 
-//}
+        TIM2->SR &= ~TIM_SR_UIF;
+		
+		if((state&BLINK_STATE) == 1){ // Если начали мигать, то меняем флаг в состоянии мигания
+			state ^= BLINK_STATUS;
+			return;
+		}
+	
+        Timer--;
+		if(Timer == 0) state = 1; // Если закончился таймер, то начинаем мигать 
+}

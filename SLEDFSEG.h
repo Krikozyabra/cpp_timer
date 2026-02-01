@@ -235,16 +235,16 @@ template <class PINS> struct InitSLEDFSEG;
 template <>
 struct InitSLEDFSEG<Typelist<>>
 {
-	static void init(){}
+	static void initPins(){}
 };
 
 template <class CurrentPin, class... RestPins>
 struct InitSLEDFSEG<Typelist<CurrentPin, RestPins...> >
 {
-	static void init(){
+	static void initPins(){
 		CurrentPin::Pin::setMode(MODE_O2);
 		CurrentPin::Pin::setCnf(CNF_OPP);
-		InitSLEDFSEG<Typelist<RestPins...> >::init();
+		InitSLEDFSEG<Typelist<RestPins...> >::initPins();
 	}
 };
 
@@ -257,37 +257,43 @@ Last 4 pins - Digit pos 1-4
 template <class Pin1, class Pin2, class Pin3, class Pin4, // A, B, C, D
 			class Pin5, class Pin6, class Pin7, class Pin8, // E, F, G, DP
 				class Pin9, class Pin10, class Pin11, class Pin12> // D1, D2, D3, D4
-struct SLEDFSEG : PinSet<typename MakePinList<0, Pin1, Pin2, Pin3, Pin4,
+class SLEDFSEG_Driver : PinSet<typename MakePinList<0, Pin1, Pin2, Pin3, Pin4,
 													Pin5, Pin6, Pin7, Pin8,
 														Pin9, Pin10, Pin11, Pin12>::Result>
 {
-	using PinList = typename MakePinList<0, Pin1, Pin2, Pin3, Pin4,
+	private:
+		using PinList = typename MakePinList<0, Pin1, Pin2, Pin3, Pin4,
 												Pin5, Pin6, Pin7, Pin8,
 													Pin9, Pin10, Pin11, Pin12>::Result;
-	using Base = PinSet<PinList>;
+		using Base = PinSet<PinList>;
 	
-	static constexpr uint16_t digitMatrix[10] = {
-				segF | segA | segB | segC | segD | segE, // 0
-				segB | segC, // 1
-				segA | segB | segG | segD | segE, // 2
-				segA | segB | segG | segC | segD, // 3
-				segF | segG | segB | segC, // 4
-				segA | segF | segG | segC | segD, // 5
-				segF | segA | segG | segC | segD | segE, // 6
-				segA | segB | segC, // 7
-				segF | segA | segB | segC | segD | segE | segG, // 8
-				segF | segA | segB | segC | segD | segG | segDP // 9
-	};
+		static constexpr uint16_t digitMatrix[10] = {
+					segF | segA | segB | segC | segD | segE, // 0
+					segB | segC, // 1
+					segA | segB | segG | segD | segE, // 2
+					segA | segB | segG | segC | segD, // 3
+					segF | segG | segB | segC, // 4
+					segA | segF | segG | segC | segD, // 5
+					segF | segA | segG | segC | segD | segE, // 6
+					segA | segB | segC, // 7
+					segF | segA | segB | segC | segD | segE | segG, // 8
+					segF | segA | segB | segC | segD | segG | segDP // 9
+		};
+	public:
 	
-	static void inline init(){
-		InitSLEDFSEG<PinList>::init();
-	} 
-	
-	static void showOnPos(uint8_t what, uint8_t where){
-		Base::Write(0);
-		uint16_t val = digitMatrix[what] | (((~(0x1<<(where-1)))&0xF)<<8);
-		Base::Write(val);
-	}
+		static void inline initPins(){
+			InitSLEDFSEG<PinList>::initPins();
+		} 
+		
+		static void showOnPos(uint8_t what, uint8_t where){
+			Base::Write(0);
+			uint16_t val = digitMatrix[what] | (((~(0x1<<(where-1)))&0xF)<<8);
+			Base::Write(val);
+		}
+		
+		static void allLedOff(){
+			Base::Write(0xF00);
+		}
 };
 
 
