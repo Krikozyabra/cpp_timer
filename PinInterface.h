@@ -8,6 +8,7 @@
 
 #define CNF_OPP 0x0
 #define CNF_OOD 0x1
+#define CNF_IPP 0x2
 
 template <class PORT, uint8_t PIN>
 class TPin{
@@ -37,5 +38,8 @@ public:
 	}
 	static void clearOdr(){
 		PORT::Clear(1<<PIN);
+	}
+	static uint16_t readIdr(){
+		return PORT::PinRead()&(1<<PIN);
 	}
 };

@@ -70,6 +70,23 @@
 
 #ifdef PORTA
 	MAKE_PORT(GPIOA, PortA, 'A')
+	
+	using Pa0 = TPin<PortA, 0>;
+	using Pa1 = TPin<PortA, 1>;
+	using Pa2 = TPin<PortA, 2>;
+	using Pa3 = TPin<PortA, 3>;
+	using Pa4 = TPin<PortA, 4>;
+	using Pa5 = TPin<PortA, 5>;
+	using Pa6 = TPin<PortA, 6>;
+	using Pa7 = TPin<PortA, 7>;
+	using Pa8 = TPin<PortA, 8>;
+	using Pa9 = TPin<PortA, 9>;
+	using Pa10 = TPin<PortA, 10>;
+	using Pa11 = TPin<PortA, 11>;
+	using Pa12 = TPin<PortA, 12>;
+	using Pa13 = TPin<PortA, 13>;
+	using Pa14 = TPin<PortA, 14>;
+	using Pa15 = TPin<PortA, 15>;
 #endif
 #ifdef PORTB
 	MAKE_PORT(GPIOB, PortB, 'B')
