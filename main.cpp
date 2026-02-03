@@ -15,12 +15,13 @@ extern "C" void EXTI4_IRQHandler(void);
 uint16_t ResetTimer = 60; // стартовое значение таймера
 uint16_t volatile Timer = ResetTimer;
 
-uint8_t volatile state = 0; // состояние 0b(settings_status)(settings_status)(blink_status)(settings_state)(blink_state)(ss_state)
+uint8_t volatile state = 0; // состояние 0b(settings_prestate)(settings_status)(settings_status)(blink_status)(settings_state)(blink_state)(ss_state)
 #define STARTSTOP_STATE 0x1
 #define BLINK_STATE 0x2
 #define SETTINGS_STATE 0x4
 #define BLINK_STATUS 0x8
 #define SETTINGS_STATUS 0x30
+#define SETTINGS_PRESTATE 0x40
 #define SETTINGS_INCREMENTOR 0x10
 
 int main(void){
@@ -30,7 +31,11 @@ int main(void){
 	
 	Pc13::setMode(MODE_O2);
 	Pc13::setCnf(CNF_OPP);
-	Pc13::setOdr()
+	Pc13::setOdr();
+	
+	Pa3::setMode(MODE_O2);
+	Pa3::setCnf(CNF_OPP);
+	Pa3::clearOdr();
 	
 	Pa4::setMode(MODE_I);
 	Pa4::setCnf(CNF_IPP);
@@ -72,26 +77,46 @@ void EXTI9_5_IRQHandler(void){
 	if(EXTI->PR & EXTI_PR_PR5){
 		EXTI->PR = EXTI_PR_PR5;
 		if(Pa5::readIdr() == 0){ // Если это восходящий край (кнопка нажата)
-			Pc13::clearOdr();
-			state |= STARTSTOP_STATE;
-			state &= ~BLINK_STATE & ~BLINK_STATUS;
-		}else{
-			
+			if((state&SETTINGS_STATE) == 0){ // Если не в состоянии настроек
+				Pc13::setOdr(); // Помечаем, что таймер остановлен (своего рода дебаг тул :) )
+				state |= BLINK_STATE; // Включаем мигание
+				state &= ~STARTSTOP_STATE; // Останавливаем таймер
+			}else{
+			}
+			state |= SETTINGS_PRESTATE; // Помечаем, что кнопка зажата
+		}else{ // Если это нисходящий край (кнопка отжата)
+			state &= ~SETTINGS_STATUS & ~SETTINGS_PRESTATE; // Обнуляем таймер до входа в\из настройки и помечаем, что кнопка отжата
 		}
 	}
 }
 
 void EXTI4_IRQHandler(void){
-	EXTI->PR = EXTI_PR_PR4;
-	Pc13::setOdr();
-	state |= BLINK_STATE;
-	state &= ~STARTSTOP_STATE;
+		EXTI->PR = EXTI_PR_PR4;
+	if((state&SETTINGS_STATE) == 0){ // если не в состоянии настроек
+		Pc13::clearOdr(); // помечаем, что таймер запустился
+		state |= STARTSTOP_STATE; // меняем состояние на "таймер запущен"
+		state &= ~BLINK_STATE & ~BLINK_STATUS; // сбрасываем состояние мигания
+	}
 }
 
 
 void TIM2_IRQHandler(void){		
 		TIM2->SR &= ~TIM_SR_UIF; // сбрасываем значение, чтобы закончить выполнение прерывания
-		if((state&BLINK_STATE) != 0) state ^= BLINK_STATUS; // Если начали мигать, то меняем флаг в состоянии мигания
+		if((state&BLINK_STATE) != 0) { // Если начали мигать
+			state ^= BLINK_STATUS;  // меняем флаг в состоянии мигания
+		}
+		if((state&SETTINGS_PRESTATE) != 0) state += SETTINGS_INCREMENTOR;
 		if((state&STARTSTOP_STATE) != 0) Timer--; // Если у нас состояние рабочего таймера, то уменьшаем значение
 		if(Timer == 0) state |= BLINK_STATE; // Если закончился таймер, то начинаем мигать 
+		if((state&SETTINGS_STATUS) == 0x30) { // Если 3 секунды прошло
+			if((state&SETTINGS_STATE) == 0){ // Если не в состоянии настроек
+				state &= ~SETTINGS_PRESTATE & ~SETTINGS_STATUS & ~BLINK_STATE & ~BLINK_STATUS; // сбрасываем пресостояние и секунды удержания
+				state |= SETTINGS_STATE; // переходим в состояние настройки
+				Pa3::setOdr();
+			}else{ // Если в состоянии настроек
+				state &= ~SETTINGS_PRESTATE & ~SETTINGS_STATUS & ~SETTINGS_STATE; // сбрасываем пресостояние, таймер до смены состояния настроек, сбрасываем состояние настроек
+				state |= BLINK_STATE; // переходим в режим мигания
+				Pa3::clearOdr();
+			}
+		}
 }
