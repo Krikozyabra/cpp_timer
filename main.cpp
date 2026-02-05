@@ -4,9 +4,9 @@
 #include "PortInterface.h"
 
 #include "stm32f10x.h" 
-#include "7seg_3_dig_timer.cpp"
+#include "SLEDFSEG.h"
 
-using MyTimer = SSEGFDIGTimer<Pb10, Pb14, Pb7, Pb5, Pb15, Pb1, Pb8, Pb6, Pb11, Pb0, Pb13, Pb9>;
+using MyTimer = SLEDFSEG_Driver<Pb10, Pb14, Pb7, Pb5, Pb15, Pb1, Pb8, Pb6, Pb11, Pb0, Pb13, Pb9>;
 
 extern "C" void TIM2_IRQHandler(void);
 extern "C" void EXTI9_5_IRQHandler(void);
@@ -15,7 +15,7 @@ extern "C" void EXTI4_IRQHandler(void);
 uint16_t ResetTimer = 60; // стартовое значение таймера
 uint16_t volatile Timer = ResetTimer;
 
-uint8_t volatile state = 0; // состояние 0b(settings_prestate)(settings_status)(settings_status)(blink_status)(settings_state)(blink_state)(ss_state)
+uint8_t volatile state = 0; // состояние 0b(setseconds_up)(settings_prestate)(settings_status)(settings_status)(blink_status)(settings_state)(blink_state)(ss_state)
 #define STARTSTOP_STATE 0x1
 #define BLINK_STATE 0x2
 #define SETTINGS_STATE 0x4
@@ -23,6 +23,7 @@ uint8_t volatile state = 0; // состояние 0b(settings_prestate)(settings
 #define SETTINGS_STATUS 0x30
 #define SETTINGS_PRESTATE 0x40
 #define SETTINGS_INCREMENTOR 0x10
+#define SETSECONDS_UP 0x80
 
 int main(void){
 	RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN; // 0x10 clock enabled for port C
@@ -69,7 +70,7 @@ int main(void){
 			MyTimer::allLedOff();
 			continue;
 		}
-		MyTimer::drawTimer(Timer);
+		MyTimer::drawNumber(Timer);
 	}
 }
 
@@ -78,10 +79,12 @@ void EXTI9_5_IRQHandler(void){
 		EXTI->PR = EXTI_PR_PR5;
 		if(Pa5::readIdr() == 0){ // Если это восходящий край (кнопка нажата)
 			if((state&SETTINGS_STATE) == 0){ // Если не в состоянии настроек
+				if((state&STARTSTOP_STATE) == 0) Timer=ResetTimer; // Если таймер уже на паузе, то обнуляем состояние таймера
 				Pc13::setOdr(); // Помечаем, что таймер остановлен (своего рода дебаг тул :) )
 				state |= BLINK_STATE; // Включаем мигание
 				state &= ~STARTSTOP_STATE; // Останавливаем таймер
 			}else{
+				state ^= SETSECONDS_UP;
 			}
 			state |= SETTINGS_PRESTATE; // Помечаем, что кнопка зажата
 		}else{ // Если это нисходящий край (кнопка отжата)
@@ -91,11 +94,15 @@ void EXTI9_5_IRQHandler(void){
 }
 
 void EXTI4_IRQHandler(void){
-		EXTI->PR = EXTI_PR_PR4;
+	EXTI->PR = EXTI_PR_PR4;
 	if((state&SETTINGS_STATE) == 0){ // если не в состоянии настроек
 		Pc13::clearOdr(); // помечаем, что таймер запустился
 		state |= STARTSTOP_STATE; // меняем состояние на "таймер запущен"
 		state &= ~BLINK_STATE & ~BLINK_STATUS; // сбрасываем состояние мигания
+	}else{ // Если в состоянии настроек
+		if((state&SETSECONDS_UP) == 0) ResetTimer--;
+		else ResetTimer++;
+		Timer = ResetTimer;
 	}
 }
 
@@ -107,11 +114,15 @@ void TIM2_IRQHandler(void){
 		}
 		if((state&SETTINGS_PRESTATE) != 0) state += SETTINGS_INCREMENTOR;
 		if((state&STARTSTOP_STATE) != 0) Timer--; // Если у нас состояние рабочего таймера, то уменьшаем значение
-		if(Timer == 0) state |= BLINK_STATE; // Если закончился таймер, то начинаем мигать 
+		if(Timer == 0) {
+			state |= BLINK_STATE; // Если закончился таймер, то начинаем мигать 
+			state &= ~STARTSTOP_STATE;
+		}
 		if((state&SETTINGS_STATUS) == 0x30) { // Если 3 секунды прошло
 			if((state&SETTINGS_STATE) == 0){ // Если не в состоянии настроек
 				state &= ~SETTINGS_PRESTATE & ~SETTINGS_STATUS & ~BLINK_STATE & ~BLINK_STATUS; // сбрасываем пресостояние и секунды удержания
 				state |= SETTINGS_STATE; // переходим в состояние настройки
+				Timer = ResetTimer;
 				Pa3::setOdr();
 			}else{ // Если в состоянии настроек
 				state &= ~SETTINGS_PRESTATE & ~SETTINGS_STATUS & ~SETTINGS_STATE; // сбрасываем пресостояние, таймер до смены состояния настроек, сбрасываем состояние настроек
