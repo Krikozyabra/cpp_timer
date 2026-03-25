@@ -6,7 +6,7 @@
 #include "stm32f10x.h" 
 #include "SLEDFSEG.h"
 
-using MyTimer = SLEDFSEG_Driver<Pb10, Pb14, Pb7, Pb5, Pb15, Pb1, Pb8, Pb6, Pb11, Pb0, Pb13, Pb9>;
+using MyTimer = SLEDFSEG_Driver<Pb10, Pb14, Pb7, Pb5, Pb15, Pb1, Pb8, Pb6, Pb11, Pb0, Pb13, Pb9>; // A, B, C, D, E, F, G, DP, D1, D2, D3, D4
 
 extern "C" void TIM2_IRQHandler(void);
 extern "C" void EXTI9_5_IRQHandler(void);
@@ -28,21 +28,19 @@ uint8_t volatile state = 0; // состояние 0b(setseconds_up)(settings_pre
 int main(void){
 	RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPAEN | RCC_APB2ENR_AFIOEN; // 0x10 clock enabled for port C
 	
-	Pb4::clearOdr();
-	
-	Pc13::setMode(MODE_O2);
+	Pc13::setMode(MODE_O2); // Пин светодиода на плате (для дебага)
 	Pc13::setCnf(CNF_OPP);
 	Pc13::setOdr();
 	
-	Pa3::setMode(MODE_O2);
+	Pa3::setMode(MODE_O2); // Пин внешнего светодиода
 	Pa3::setCnf(CNF_OPP);
 	Pa3::clearOdr();
 	
-	Pa4::setMode(MODE_I);
+	Pa4::setMode(MODE_I); // Пин кнопки для переключения режима настройки/таймера
 	Pa4::setCnf(CNF_IPP);
 	GPIOA->ODR |= GPIO_ODR_ODR4;
 	
-	Pa5::setMode(MODE_I);
+	Pa5::setMode(MODE_I); // Пин кнопки для управления в режиме настройки/таймера
 	Pa5::setCnf(CNF_IPP);
 	GPIOA->ODR |= GPIO_ODR_ODR5; // включение pull-up mode
 	
