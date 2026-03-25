@@ -36,11 +36,11 @@ int main(void){
 	Pa3::setCnf(CNF_OPP);
 	Pa3::clearOdr();
 	
-	Pa4::setMode(MODE_I); // Пин кнопки для переключения режима настройки/таймера
+	Pa4::setMode(MODE_I); // Пин кнопки для управления в режиме настройки/таймера
 	Pa4::setCnf(CNF_IPP);
 	GPIOA->ODR |= GPIO_ODR_ODR4;
 	
-	Pa5::setMode(MODE_I); // Пин кнопки для управления в режиме настройки/таймера
+	Pa5::setMode(MODE_I); // Пин кнопки для переключения режима настройки/таймера
 	Pa5::setCnf(CNF_IPP);
 	GPIOA->ODR |= GPIO_ODR_ODR5; // включение pull-up mode
 	
